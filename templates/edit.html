@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Edit System Message</h2>
+        <form method="POST" class="needs-validation" novalidate>
+            <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ message.name }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="bio" class="form-label">Bio</label>
+                <textarea class="form-control" id="bio" name="bio" rows="3" required>{{ message.bio }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="voice_style" class="form-label">Voice Style</label>
+                <textarea class="form-control" id="voice_style" name="voice_style" rows="3" required>{{ message.voice_style }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="persona" class="form-label">Persona</label>
+                <textarea class="form-control" id="persona" name="persona" rows="5" required>{{ message.persona }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="rules" class="form-label">Rules</label>
+                <textarea class="form-control" id="rules" name="rules" rows="5" required>{{ message.rules }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="instructions" class="form-label">Instructions</label>
+                <textarea class="form-control" id="instructions" name="instructions" rows="5" required>{{ message.instructions }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <label for="example_dialogue" class="form-label">Example Dialogue</label>
+                <textarea class="form-control" id="example_dialogue" name="example_dialogue" rows="5" required>{{ message.example_dialogue }}</textarea>
+            </div>
+
+            <div class="mb-3">
+                <button type="submit" class="btn btn-primary">Update Message</button>
+                <a href="{{ url_for('list_messages') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

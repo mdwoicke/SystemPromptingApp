@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="px-4 py-5 my-5 text-center">
+    <h1 class="display-5 fw-bold">System Message Manager</h1>
+    <div class="col-lg-6 mx-auto">
+        <p class="lead mb-4">
+            Create, manage, and publish system messages for your applications.
+            Streamline your message templates with our easy-to-use interface.
+        </p>
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <a href="{{ url_for('generate_template') }}" class="btn btn-primary btn-lg px-4 gap-3">
+                Generate New Message
+            </a>
+            <a href="{{ url_for('list_messages') }}" class="btn btn-outline-secondary btn-lg px-4">
+                View All Messages
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

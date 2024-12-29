@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4" style="position: sticky; top: 1rem; align-self: start;">
+            <div class="card bg-dark mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Template Organization</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <select class="form-select bg-dark text-light" id="category">
+                            <option value="">Select a category</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tags" class="form-label">Tags</label>
+                        <select class="form-select bg-dark text-light" id="tags" multiple>
+                            {% for tag in tags %}
+                            <option value="{{ tag.id }}">{{ tag.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple tags</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-dark">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Components</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="bio">
+                            <i class="bi bi-person-badge me-2"></i>Bio
+                        </div>
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="voice">
+                            <i class="bi bi-mic me-2"></i>Voice Style
+                        </div>
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="persona">
+                            <i class="bi bi-person-circle me-2"></i>Persona
+                        </div>
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="rules">
+                            <i class="bi bi-list-check me-2"></i>Rules
+                        </div>
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="instructions">
+                            <i class="bi bi-info-circle me-2"></i>Instructions
+                        </div>
+                        <div class="list-group-item draggable bg-dark text-light border-secondary" data-type="example_dialogue">
+                            <i class="bi bi-chat-dots me-2"></i>Example Dialogue
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card bg-dark">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Preview</h5>
+                    <button id="save" class="btn btn-primary">Save Template</button>
+                </div>
+                <div class="card-body">
+                    <div id="preview" class="border border-secondary rounded p-3" style="min-height: 400px;">
+                        <div id="empty" class="text-center text-muted">
+                            Drag components here
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
+
+<script>
+$(function() {
+    const csrfToken = "{{ csrf_token() }}";  // Get CSRF token from Jinja template
+
+    $(".draggable").draggable({
+        helper: "clone",
+        cursor: "move",
+        revert: "invalid",
+        zIndex: 100
+    });
+
+    function initDraggable() {
+        $(".draggable").draggable({
+            helper: "clone",
+            cursor: "move",
+            revert: "invalid",
+            zIndex: 100
+        });
+    }
+
+    initDraggable();
+
+    $("#preview").droppable({
+        accept: ".draggable",
+        drop: function(event, ui) {
+            $("#empty").remove();
+
+            var type = $(ui.draggable).data("type");
+            var title = $(ui.draggable).text();
+
+            var personaFields = ['age', 'occupation', 'attitude', 'education', 'personality', 'communication_style', 'skills', 'knowledge'];
+            var isMultiValue = ['Rules', 'Instructions', 'Example Dialogue'].includes(title.trim());
+            var component;
+
+            if (type === 'persona') {
+                component = $('<div class="mb-3 component">' +
+                    '<div class="card bg-dark border-secondary">' +
+                    '<div class="card-header d-flex justify-content-between align-items-center">' +
+                    '<span>' + title + '</span>' +
+                    '<button class="btn btn-sm btn-danger remove">×</button>' +
+                    '</div>' +
+                    '<div class="card-body values-container">' +
+                    '<div class="mb-2 persona-fields">' +
+                    '<select class="form-select bg-dark text-light persona-field-select">' +
+                      '<option value="">Select a field</option>' +
+                      personaFields.forEach(field => {
+                        '<option value="' + field + '">' + field + '</option>';
+                      }) +
+                    '</select>' +
+                    '<input class="form-control bg-dark text-light persona-field-input" type="text" placeholder="Enter value">' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>');
+            } else {
+                component = $('<div class="mb-3 component">' +
+                    '<div class="card bg-dark border-secondary">' +
+                    '<div class="card-header d-flex justify-content-between align-items-center">' +
+                    '<span>' + title + '</span>' +
+                    '<div>' +
+                    (isMultiValue ? '<button class="btn btn-sm btn-success add-item me-2">Add Item</button>' : '') +
+                    '<button class="btn btn-sm btn-danger remove">×</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="card-body values-container">' +
+                    (type === 'example_dialogue' ? 
+                        '<div class="mb-3 value-item">' +
+                        '<div class="mb-2">' +
+                        '<label class="form-label">Agent</label>' +
+                        '<textarea class="form-control bg-dark text-light agent-text" rows="2" placeholder="Agent\'s dialogue"></textarea>' +
+                        '</div>' +
+                        '<div class="mb-2">' +
+                        '<label class="form-label">Caller</label>' +
+                        '<textarea class="form-control bg-dark text-light caller-text" rows="2" placeholder="Caller\'s response"></textarea>' +
+                        '</div>' +
+                        '<button class="btn btn-sm btn-outline-danger remove-item">Remove Exchange</button>' +
+                        '</div>' :
+                        '<div class="mb-2 value-item">' +
+                        (type === 'instructions' ? 
+                            '<textarea class="form-control bg-dark text-light" rows="3" placeholder="e.g. You are assisting customers with their orders. Ensure you collect the following information if any are missing:"></textarea>' :
+                            '<textarea class="form-control bg-dark text-light" rows="3" placeholder="Enter text here..."></textarea>'
+                        ) +
+                        '</div>'
+                    ) +
+                    '</div>' +
+                    '</div>' +
+                    '</div>');
+            }
+
+            $(this).append(component);
+        }
+    });
+
+    $(document).on("click", ".remove", function() {
+        $(this).closest(".component").remove();
+        if ($("#preview").children(".component").length === 0) {
+            $("#preview").append('<div id="empty" class="text-center text-muted">Drag components here</div>');
+        }
+    });
+
+    $(document).on("click", ".add-item", function(e) {
+        e.preventDefault();
+        var valueContainer = $(this).closest('.card').find('.values-container');
+        var type = $(this).closest('.component').find('.card-header span').text().trim();
+
+        if (type === 'Example Dialogue') {
+            valueContainer.append(
+                '<div class="mb-3 value-item">' +
+                '<div class="mb-2">' +
+                '<label class="form-label">Agent</label>' +
+                '<textarea class="form-control bg-dark text-light agent-text" rows="2" placeholder="Agent\'s dialogue"></textarea>' +
+                '</div>' +
+                '<div class="mb-2">' +
+                '<label class="form-label">Caller</label>' +
+                '<textarea class="form-control bg-dark text-light caller-text" rows="2" placeholder="Caller\'s response"></textarea>' +
+                '</div>' +
+                '<button class="btn btn-sm btn-outline-danger remove-item">Remove Exchange</button>' +
+                '</div>'
+            );
+        } else {
+            valueContainer.append(
+                '<div class="mb-2 value-item">' +
+                '<div class="d-flex gap-2">' +
+                '<textarea class="form-control bg-dark text-light" rows="3"></textarea>' +
+                '<button class="btn btn-sm btn-outline-danger remove-item">×</button>' +
+                '</div>' +
+                '</div>'
+            );
+        }
+    });
+
+    $(document).on("click", ".remove-item", function(e) {
+        e.preventDefault();
+        $(this).closest('.value-item').remove();
+    });
+
+    $("#save").click(function() {
+        var components = [];
+        $(".component").each(function() {
+            var type = $(this).find(".draggable").data("type") || 
+                      $(this).find("span").text().trim().replace(/\s+/g, '_').toLowerCase();
+
+            if (type === 'persona') {
+                var personaData = {};
+                $(this).find('.persona-fields').find('.persona-field-select, .persona-field-input').each(function(){
+                  const fieldName = $(this).hasClass('persona-field-select') ? $(this).val() : null;
+                  const value = $(this).hasClass('persona-field-input') ? $(this).val().trim() : null;
+                  if(fieldName && value){
+                    personaData[fieldName] = value;
+                  }
+                });
+                // Ensure we have at least one field filled
+                if (Object.keys(personaData).length > 0) {
+                    components.push({
+                        type: type,
+                        content: personaData
+                    });
+                }
+            } else if (type === 'example_dialogue') {
+                var dialogues = [];
+                $(this).find(".value-item").each(function() {
+                    var agent = $(this).find('.agent-text').val().trim();
+                    var caller = $(this).find('.caller-text').val().trim();
+                    if (agent) {
+                        dialogues.push('Agent: ' + agent);
+                    }
+                    if (caller) {
+                        dialogues.push('Caller: ' + caller);
+                    }
+                });
+                components.push({
+                    type: type,
+                    content: dialogues.join('\n')
+                });
+            } else {
+                var values = [];
+                $(this).find(".values-container textarea").each(function() {
+                    var value = $(this).val().trim();
+                    if (value) values.push(value);
+                });
+                components.push({
+                    type: type,
+                    content: values.join('\n')
+                });
+            }
+        });
+
+        if (components.length === 0) {
+            alert("Please add at least one component");
+            return;
+        }
+
+        // Get selected category and tags
+        const categoryId = $("#category").val();
+        const tagIds = $("#tags").val();
+
+        $.ajax({
+            url: "/save-template",
+            method: "POST",
+            contentType: "application/json",
+            headers: {
+                'X-CSRFToken': csrfToken  // Add CSRF token to headers
+            },
+            data: JSON.stringify({
+                components: components,
+                category_id: categoryId || null,
+                tags: tagIds || []
+            }),
+            success: function(response) {
+                if (response.success) {
+                    window.location.href = response.redirect_url || "/messages";
+                } else {
+                    alert("Error saving template: " + (response.error || "Unknown error occurred"));
+                }
+            },
+            error: function(xhr, status, error) {
+                var errorMessage = "";
+                try {
+                    errorMessage = xhr.responseJSON.error || error;
+                } catch (e) {
+                    errorMessage = error || "Failed to save template";
+                }
+                alert("Error saving template: " + errorMessage);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

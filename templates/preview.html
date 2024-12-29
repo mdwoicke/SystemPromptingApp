@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Preview System Message</h2>
+            <div>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('export_message', id=message.id, format='xml') }}" class="btn btn-info">
+                        <i class="bi bi-download"></i> Export XML
+                    </a>
+                    <a href="{{ url_for('export_message', id=message.id, format='json') }}" class="btn btn-info">
+                        <i class="bi bi-download"></i> Export JSON
+                    </a>
+                </div>
+                {% if not message.published %}
+                <form action="{{ url_for('publish_message', id=message.id) }}" method="post" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-cloud-upload"></i> Publish
+                    </button>
+                </form>
+                {% else %}
+                <form action="{{ url_for('unpublish_message', id=message.id) }}" method="post" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-cloud-slash"></i> Unpublish
+                    </button>
+                </form>
+                {% endif %}
+                <a href="{{ url_for('edit_message', id=message.id) }}" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+            </div>
+        </div>
+
+        {% if message.original or message.copies %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Version History</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    Current Version: {{ message.version_number }}
+                    {% if message.version_note %}
+                    <br>
+                    <small class="text-muted">{{ message.version_note }}</small>
+                    {% endif %}
+                </p>
+                {% set versions = message.get_version_history() %}
+                {% if versions|length > 1 %}
+                <div class="list-group">
+                    {% for version in versions %}
+                    <a href="{{ url_for('preview_message', id=version.id) }}" 
+                       class="list-group-item list-group-item-action {% if version.id == message.id %}active{% endif %}">
+                        Version {{ version.version_number }} - {{ version.name }}
+                        <small class="text-muted d-block">Created: {{ version.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ message.name }}</h5>
+            </div>
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2">XML Preview</h6>
+                <div class="card-text">
+                    <pre class="bg-dark text-light p-3 rounded" style="white-space: pre !important; overflow-x: auto; font-family: 'Consolas', monospace; tab-size: 4;"><code>&lt;system_message&gt;
+    &lt;bio&gt;{{ message.bio }}&lt;/bio&gt;
+    &lt;voice_style&gt;{{ message.voice_style }}&lt;/voice_style&gt;
+    &lt;persona&gt;
+        {%- for key, value in message.persona.items() %}
+        &lt;{{ key }}&gt;{{ value }}&lt;/{{ key }}&gt;
+        {%- endfor %}
+    &lt;/persona&gt;
+    &lt;important_rules&gt;
+        {%- for rule in message.rules %}
+        &lt;rule&gt;{{ rule }}&lt;/rule&gt;
+        {%- endfor %}
+    &lt;/important_rules&gt;
+    &lt;instructions&gt;
+        You are assisting customers with their orders. Ensure you collect the following information. if any are missing are missing, be sure to ask the caller to provide any of the following required information. If the caller is not sure of the answer, be sure to prompt the caller to provide any missing information. The following information is required for each order item:
+        &lt;required_information&gt;
+            {%- for instruction in message.instructions[1:] %}
+            &lt;item&gt;{{ instruction }}&lt;/item&gt;
+            {%- endfor %}
+        &lt;/required_information&gt;
+        Here is an ideal call flow example to strive for. Do your best to answer verbatim based on similar responses by caller. If call flow veers off track, be sure to continue on when the next caller utterance is matched to any intent or is matched semantically to a similar dialogue node in the following target call flow:
+        &lt;ideal_call_example&gt;
+            &lt;dialogue&gt;
+                {%- for dialogue in message.example_dialogue %}
+                {%- if dialogue is string %}
+                    {%- if dialogue.startswith('Agent:') %}
+                &lt;agent&gt;{{ dialogue[6:].strip() }}&lt;/agent&gt;
+                    {%- elif dialogue.startswith('Caller:') or dialogue.startswith('Customer:') %}
+                &lt;customer&gt;{{ dialogue[dialogue.index(':')+1:].strip() }}&lt;/customer&gt;
+                    {%- endif %}
+                {%- elif dialogue is mapping %}
+                    {%- for role, text in dialogue.items() %}
+                &lt;{{ role }}&gt;{{ text }}&lt;/{{ role }}&gt;
+                    {%- endfor %}
+                {%- endif %}
+                {%- endfor %}
+            &lt;/dialogue&gt;
+        &lt;/ideal_call_example&gt;
+    &lt;/instructions&gt;
+&lt;/system_message&gt;</code></pre>
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                {% if message.published %}
+                    Published on: {{ message.published_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                {% else %}
+                    Not yet published
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1043 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <form id="optimizeForm" class="mb-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="schemaId" class="form-label">Select Template to Optimize</label>
+                            <select class="form-select bg-dark text-light" id="schemaId" required>
+                                <option value="">Choose a template...</option>
+                                {% for message in messages %}
+                                <option value="{{ message.id }}">{{ message.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="customOptimization" class="form-label">Custom Optimization Request</label>
+                            <textarea class="form-control bg-dark text-light" id="customOptimization" rows="6" style="min-height: 120px; resize: vertical;"
+                                placeholder="Enter specific changes or optimizations you'd like to make"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary" id="optimizeBtn">
+                    <i class="bi bi-lightning"></i> Analyze & Optimize
+                </button>
+            </form>
+
+            <div id="optimizingStatus" class="d-none">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Optimizing...</span>
+                    </div>
+                    <span>Analyzing and applying optimizations...</span>
+                </div>
+            </div>
+
+            <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+            <div id="successAlert" class="alert alert-success d-none" role="alert"></div>
+
+            <div id="templatePreview" class="d-none">
+                <div class="card bg-dark border-secondary mb-4">
+                    <div class="card-header bg-dark border-bottom border-secondary d-flex justify-content-between align-items-center py-3">
+                        <h5 class="mb-0 text-light">
+                            <i class="bi bi-code-square me-2"></i>XML Preview
+                        </h5>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-secondary me-2" id="previewXmlBtn">
+                                <i class="bi bi-eye"></i> Preview
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" id="saveChangesBtn" disabled>
+                                <i class="bi bi-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="xml-preview">
+                            <code id="xmlContent" class="editable-xml"></code>
+                        </div>
+                    </div>
+                </div>
+                <div class="bottom-save-button">
+                    <button type="button" class="btn btn-sm btn-primary" id="bottomSaveChangesBtn" disabled>
+                        <i class="bi bi-save"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- XML Preview Modal -->
+<div class="modal fade" id="xmlPreviewModal" tabindex="-1" aria-labelledby="xmlPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="xmlPreviewModalLabel">XML Preview</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="bg-dark text-light p-3 rounded" style="white-space: pre !important; overflow-x: auto; font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; tab-size: 4;"><code id="xmlPreviewContent"></code></pre>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-sm btn-secondary" id="copyXmlBtn">
+                    <i class="bi bi-clipboard"></i> Copy to Clipboard
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.xml-preview {
+    background-color: #1e1e1e;
+    padding: 1.5rem;
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre !important;
+    border-radius: 0 0 4px 4px;
+    min-height: 300px;
+}
+
+.xml-preview code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #d4d4d4;
+    display: block;
+    white-space: pre !important;
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+}
+
+/* XML Syntax Highlighting */
+.xml-preview .tag { color: #569cd6; }
+.xml-preview .attribute { color: #9cdcfe; }
+.xml-preview .string { color: #ce9178; }
+.xml-preview .comment { color: #6a9955; }
+
+.editable-node {
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.05);
+    min-width: 400px;
+    display: inline-block;
+}
+
+.editable-node:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.editing {
+    background-color: rgba(30, 64, 175, 0.3) !important;
+    outline: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+.node-edit-input {
+    background-color: #2a2a2a;
+    color: #fff;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: inherit;
+    width: calc(100% - 16px);
+    margin: 4px 8px;
+    transition: all 0.2s ease;
+    min-height: 60px;
+    resize: vertical;
+    min-width: 400px;
+}
+
+.node-edit-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.form-control {
+    min-height: 60px;
+    padding: 8px;
+    font-size: 14px;
+    resize: vertical;
+    width: 400px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bottom-save-button {
+    position: sticky;
+    bottom: 20px;
+    right: 20px;
+    text-align: right;
+    padding: 15px;
+    background: rgba(33, 37, 41, 0.95);
+    border-radius: 8px;
+    z-index: 1000;
+    margin-top: 20px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Styling */
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    background-color: #0a58ca;
+    border-color: #0a53be;
+    transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    opacity: 0.65;
+}
+
+/* Section Headers */
+.section-header h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+    height: 31px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-sm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-sm:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn-sm i {
+    font-size: 14px;
+    margin-right: 4px;
+}
+
+
+.speaker-type-select:focus {
+    outline: none;
+    border-color: #0d6efd;
+}
+
+.dialogue-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    position: relative;
+}
+
+.editable-node-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 0;
+}
+
+.delete-node-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    margin-left: 8px;
+    color: #dc3545;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.delete-node-btn:hover {
+    color: #bb2d3b;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 4px;
+}
+
+.delete-node-btn i {
+    font-size: 14px;
+}
+
+.dialogue-node:hover .delete-node-btn,
+.editable-node-wrapper:hover .delete-node-btn {
+    opacity: 1;
+}
+
+
+.add-node-btn {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    margin-left: 0.5rem;
+}
+
+.speaker-type-select {
+    background-color: #2a2a2a;
+    color: #fff;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    padding: 6px 12px;
+    margin-right: 8px;
+    font-size: 14px;
+    height: 31px;
+    width: 140px;
+}
+
+.persona-type-select {
+    background-color: #2a2a2a;
+    color: #fff;
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    padding: 6px 12px;
+    margin-right: 8px;
+    font-size: 14px;
+    height: 31px;
+    width: 140px;
+}
+
+/* Add styles for the preview modal */
+.modal-dialog.modal-lg {
+    max-width: 90%;
+}
+
+.modal-content {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#xmlPreviewContent {
+    color: #d4d4d4;
+    min-height: 200px;
+}
+</style>
+
+<script>
+// Global variables and functions
+const personaAttributes = ['age', 'name', 'description', 'occupation', 'attitude', 'education', 'personality', 'communication_style', 'skills', 'knowledge'];
+let hasUnsavedChanges = false;
+let currentEdit = null;
+
+function updateSaveButtons(disabled) {
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const bottomSaveChangesBtn = document.getElementById('bottomSaveChangesBtn');
+    if (saveChangesBtn && bottomSaveChangesBtn) {
+        saveChangesBtn.disabled = disabled;
+        bottomSaveChangesBtn.disabled = disabled;
+    }
+}
+
+function makeNodeEditable(element) {
+    const content = element.textContent;
+    const textarea = document.createElement('textarea');
+    textarea.value = content;
+    textarea.className = 'node-edit-input';
+
+    // Set initial height based on content
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+
+    element.dataset.originalContent = content;
+    element.textContent = '';
+    element.appendChild(textarea);
+    element.classList.add('editing');
+
+    textarea.focus();
+    currentEdit = element;
+
+    // Auto-resize textarea as user types
+    textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.max(60, this.scrollHeight) + 'px';
+    });
+
+    textarea.addEventListener('blur', function() {
+        finishEditing(element, textarea.value);
+    });
+
+    textarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            textarea.blur();
+        } else if (e.key === 'Escape') {
+            finishEditing(element, element.dataset.originalContent);
+        }
+    });
+}
+
+function finishEditing(element, newValue) {
+    if (element.classList.contains('editing')) {
+        element.textContent = newValue;
+        element.classList.remove('editing');
+        if (newValue !== element.dataset.originalContent) {
+            hasUnsavedChanges = true;
+            updateSaveButtons(false);
+        }
+    }
+}
+
+function wrapEditableNode(node, isDialogue = false) {
+    if (isDialogue) {
+        const dialogueNode = node.closest('.dialogue-node');
+        if (dialogueNode) {
+            const existingBtn = dialogueNode.querySelector('.delete-node-btn');
+            if (existingBtn) {
+                existingBtn.remove();
+            }
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-node-btn';
+            deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                dialogueNode.remove();
+                hasUnsavedChanges = true;
+                updateSaveButtons(false);
+            };
+            dialogueNode.appendChild(deleteBtn);
+        }
+    } else {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'editable-node-wrapper';
+        node.parentNode.insertBefore(wrapper, node);
+        wrapper.appendChild(node);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-node-btn';
+        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            wrapper.remove();
+            hasUnsavedChanges = true;
+            updateSaveButtons(false);
+        };
+        wrapper.appendChild(deleteBtn);
+    }
+}
+
+function addPersonaNode() {
+    const personaSection = document.getElementById('personaSection');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'dialogue-node';
+
+    // Get already used attributes
+    const usedAttributes = Array.from(personaSection.querySelectorAll('.speaker-type-select')).map(select => select.value);
+
+    const select = document.createElement('select');
+    select.className = 'speaker-type-select bg-dark text-light me-2 persona-type-select';
+
+    // Filter out used attributes
+    const availableAttributes = personaAttributes.filter(attr => !usedAttributes.includes(attr));
+
+    availableAttributes.forEach(attr => {
+        const option = document.createElement('option');
+        option.value = attr;
+        option.textContent = attr.charAt(0).toUpperCase() + attr.slice(1).replace('_', ' ');
+        select.appendChild(option);
+    });
+
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'editable-node';
+    contentSpan.dataset.nodeType = 'persona.' + select.value;
+    contentSpan.textContent = '';
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(contentSpan);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-node-btn';
+    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        wrapper.remove();
+        hasUnsavedChanges = true;
+        updateSaveButtons(false);
+    };
+    wrapper.appendChild(deleteBtn);
+    personaSection.appendChild(wrapper);
+
+    // Add click handler for the editable node
+    contentSpan.addEventListener('click', function(e) {
+        if (!this.classList.contains('editing')) {
+            e.stopPropagation();
+            if (currentEdit && currentEdit !== this) {
+                finishEditing(currentEdit, currentEdit.querySelector('textarea')?.value || currentEdit.dataset.originalContent);
+            }
+            makeNodeEditable(this);
+        }
+    });
+
+    // Update data-node-type when select changes
+    select.addEventListener('change', function() {
+        contentSpan.dataset.nodeType = 'persona.' + this.value;
+        hasUnsavedChanges = true;
+        updateSaveButtons(false);
+    });
+
+    makeNodeEditable(contentSpan);
+    hasUnsavedChanges = true;
+    updateSaveButtons(false);
+}
+
+function getPersonaValues() {
+    const personaSection = document.getElementById('personaSection');
+    const personaNodes = personaSection.querySelectorAll('.dialogue-node');
+    const personaValues = {};
+
+    personaNodes.forEach(node => {
+        const select = node.querySelector('select');
+        const content = node.querySelector('.editable-node');
+        if (select && content) {
+            personaValues[select.value] = content.textContent.trim();
+        }
+    });
+
+    return personaValues;
+}
+
+function deleteNode(element) {
+    const nodeWrapper = element.closest('.editable-node-wrapper, .dialogue-node');
+    if (nodeWrapper) {
+        nodeWrapper.remove();
+        hasUnsavedChanges = true;
+        updateSaveButtons(false);
+    }
+}
+
+function addNewNode(section, type) {
+    const container = document.querySelector(`#${section}`);
+    const nodes = container.querySelectorAll('.editable-node');
+    const newIndex = nodes.length;
+
+    if (section === 'dialogueSection') {
+        const dialogueWrapper = document.createElement('div');
+        dialogueWrapper.className = 'dialogue-node';
+
+        const speakerSelect = document.createElement('select');
+        speakerSelect.className = 'speaker-type-select';
+        speakerSelect.innerHTML = `
+            <option value="agent">Agent</option>
+            <option value="customer">Customer</option>
+        `;
+
+        const contentSpan = document.createElement('span');
+        contentSpan.className = 'editable-node';
+        contentSpan.dataset.nodeType = `dialogue.${newIndex}`;
+
+        dialogueWrapper.appendChild(speakerSelect);
+        dialogueWrapper.appendChild(contentSpan);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-node-btn';
+        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteNode(e.target.closest('button'));
+        };
+        dialogueWrapper.appendChild(deleteBtn);
+
+        container.appendChild(dialogueWrapper);
+
+        contentSpan.addEventListener('click', function(e) {
+            if (!this.classList.contains('editing')) {
+                e.stopPropagation();
+                if (currentEdit && currentEdit !== this) {
+                    finishEditing(currentEdit, currentEdit.querySelector('input')?.value || currentEdit.dataset.originalContent);
+                }
+                makeNodeEditable(this);
+            }
+        });
+
+        speakerSelect.addEventListener('change', function() {
+            hasUnsavedChanges = true;
+            updateSaveButtons(false);
+        });
+
+        makeNodeEditable(contentSpan);
+    } else {
+        const newNode = document.createElement('span');
+        newNode.className = 'editable-node';
+        newNode.dataset.nodeType = `${type}.${newIndex}`;
+        newNode.textContent = '';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'editable-node-wrapper';
+
+        switch (section) {
+            case 'rulesSection':
+                wrapper.innerHTML = `        <rule>${newNode.outerHTML}</rule>`;
+                break;
+            case 'instructionsSection':
+                wrapper.innerHTML = `        <item>${newNode.outerHTML}</item>`;
+                break;
+        }
+
+        container.insertAdjacentHTML('beforeend', '\n' + wrapper.innerHTML);
+
+        const addedNode = container.querySelector(`[data-node-type="${type}.${newIndex}"]`);
+        wrapEditableNode(addedNode);
+
+        addedNode.addEventListener('click', function(e) {
+            if (!this.classList.contains('editing')) {
+                e.stopPropagation();
+                if (currentEdit && currentEdit !== this) {
+                    finishEditing(currentEdit, currentEdit.querySelector('input')?.value || currentEdit.dataset.originalContent);
+                }
+                makeNodeEditable(this);
+            }
+        });
+
+        makeNodeEditable(addedNode);
+    }
+
+    hasUnsavedChanges = true;
+    updateSaveButtons(false);
+}
+
+async function loadTemplatePreview(templateId) {
+    try {
+        const response = await fetch(`/get-template/${templateId}`);
+        if (!response.ok) throw new Error('Failed to fetch template details');
+
+        const data = await response.json();
+        const xmlContent = document.getElementById('xmlContent');
+        let content = [];
+
+        content.push('<system_message>');
+
+        // Bio Section
+        content.push('    <!-- Bio Section -->');
+        content.push('    <div class="section-header">');
+        content.push('        <h6 class="text-muted mb-2">Bio Information</h6>');
+        content.push('    </div>');
+        content.push(`    <bio><span class="editable-node" data-node-type="bio">${data.bio || ''}</span></bio>`);
+
+        // Voice Style Section
+        content.push('    <!-- Voice Style Section -->');
+        content.push('    <div class="section-header">');
+        content.push('        <h6 class="text-muted mb-2">Voice Style</h6>');
+        content.push('    </div>');
+        content.push(`    <voice_style><span class="editable-node" data-node-type="voice_style">${data.voice_style || ''}</span></voice_style>`);
+
+        // Persona Section
+        content.push('    <!-- Persona Section -->');
+        content.push('    <div class="section-header">');
+        content.push('        <h6 class="text-muted mb-2">Persona Attributes</h6>');
+        content.push('        <button type="button" class="btn btn-sm btn-primary" onclick="addPersonaNode()">');
+        content.push('            <i class="bi bi-plus-circle"></i> Add Attribute');
+        content.push('        </button>');
+        content.push('    </div>');
+        content.push('    <div id="personaSection">');
+
+        // Add persona attributes
+        for (const [key, value] of Object.entries(data.persona || {})) {
+            if (value) {
+                content.push('        <div class="dialogue-node">');
+                content.push('            <select class="speaker-type-select bg-dark text-light persona-type-select">');
+                personaAttributes.forEach(attr => {
+                    const isSelected = attr === key;
+                    const displayName = attr.charAt(0).toUpperCase() + attr.slice(1).replace(/_/g, ' ');
+                    content.push(`                <option value="${attr}" ${isSelected ? 'selected' : ''}>${displayName}</option>`);
+                });
+                content.push('            </select>');
+                content.push(`            <span class="editable-node" data-node-type="persona.${key}">${value}</span>`);
+                content.push('        </div>');
+            }
+        }
+        content.push('    </div>');
+
+        // Rules Section
+        content.push('    <!-- Rules Section -->');
+        content.push('    <div class="section-header">');
+        content.push('        <h6 class="text-muted mb-2">Important Rules</h6>');
+        content.push('        <button type="button" class="btn btn-sm btn-primary add-node-btn" onclick="addNewNode(\'rulesSection\', \'rules\')">');
+        content.push('            <i class="bi bi-plus-circle"></i> Add Rule');
+        content.push('        </button>');
+        content.push('    </div>');
+        content.push('    <div id="rulesSection">');
+        if (Array.isArray(data.rules)) {
+            data.rules.forEach((rule, index) => {
+                content.push(`        <rule><span class="editable-node" data-node-type="rules.${index}">${rule || ''}</span></rule>`);
+            });
+        }
+        content.push('    </div>');
+
+        // Instructions Section
+        content.push('    <!-- Instructions Section -->');
+        content.push('    <div class="section-header">');
+        content.push('        <h6 class="text-muted mb-2">Instructions</h6>');
+        content.push('        <button type="button" class="btn btn-sm btn-primary add-node-btn" onclick="addNewNode(\'instructionsSection\', \'instructions\')">');
+        content.push('            <i class="bi bi-plus-circle"></i> Add Instruction');
+        content.push('        </button>');
+        content.push('    </div>');
+        content.push('    <div id="instructionsSection">');
+        if (Array.isArray(data.instructions)) {
+            data.instructions.forEach((instruction, index) => {
+                content.push(`        <item><span class="editable-node" data-node-type="instructions.${index}">${instruction || ''}</span></item>`);
+            });
+        }
+        content.push('    </div>');
+
+        // Example Dialogue Section
+        if (Array.isArray(data.example_dialogue)) {
+            content.push('    <!-- Example Dialogue Section -->');
+            content.push('    <div class="section-header">');
+            content.push('        <h6 class="text-muted mb-2">Example Dialogue</h6>');
+            content.push('        <button type="button" class="btn btn-sm btn-primary add-node-btn" onclick="addNewNode(\'dialogueSection\', \'dialogue\')">');
+            content.push('            <i class="bi bi-plus-circle"></i> Add Dialogue');
+            content.push('        </button>');
+            content.push('    </div>');
+            content.push('    <div id="dialogueSection">');
+            data.example_dialogue.forEach((dialogue, index) => {
+                if (typeof dialogue === 'string') {
+                    const line = dialogue.trim();
+                    const isAgent = line.startsWith('Agent:');
+                    const isCustomer = line.startsWith('Customer:') || line.startsWith('Caller:');
+                    const colonIndex = line.indexOf(':');
+                    const text = colonIndex !== -1 ? line.substring(colonIndex + 1).trim() : line;
+
+                    content.push('                <div class="dialogue-node">');
+                    content.push('                    <select class="speaker-type-select">');
+                    content.push(`                        <option value="agent" ${isAgent ? 'selected' : ''}>Agent</option>`);
+                    content.push(`                        <option value="customer" ${isCustomer ? 'selected' : ''}>Customer</option>`);
+                    content.push('                    </select>');
+                    content.push(`                    <span class="editable-node" data-node-type="dialogue.${index}">${text}</span>`);
+                    content.push('                </div>');
+                }
+            });
+            content.push('    </div>');
+        }
+
+        content.push('</system_message>');
+
+        xmlContent.innerHTML = content.join('\n');
+        templatePreview.classList.remove('d-none');
+        hasUnsavedChanges = false;
+        updateSaveButtons(true);
+
+        // Add click handlers and wrap editable nodes
+        document.querySelectorAll('.editable-node').forEach(node => {
+            const isDialogue = node.closest('.dialogue-node') !== null;
+            if (!isDialogue) {
+                wrapEditableNode(node);
+            }
+
+            node.addEventListener('click', function(e) {
+                if (!this.classList.contains('editing')) {
+                    e.stopPropagation();
+                    if (currentEdit && currentEdit !== this) {
+                        finishEditing(currentEdit, currentEdit.querySelector('input')?.value || currentEdit.dataset.originalContent);
+                    }
+                    makeNodeEditable(this);
+                }
+            });
+        });
+
+        // Add delete buttons to dialogue nodes
+        document.querySelectorAll('.dialogue-node').forEach(node => {
+            const editableNode = node.querySelector('.editable-node');
+            if (editableNode) {
+                wrapEditableNode(editableNode, true);
+            }
+        });
+
+        document.querySelectorAll('.speaker-type-select').forEach(select => {
+            select.addEventListener('change', function() {
+                hasUnsavedChanges = true;
+                updateSaveButtons(false);
+            });
+        });
+
+        window.addNewNode = addNewNode;
+
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Failed to load template preview');
+    }
+}
+
+async function saveChanges() {
+    const templateId = schemaId.value;
+    if (!templateId) return;
+
+    const updates = {
+        persona: getPersonaValues()
+    };
+
+    // Only collect data from nodes that haven't been deleted
+    document.querySelectorAll('.editable-node').forEach(node => {
+        const nodeType = node.dataset.nodeType;
+        const value = node.textContent;
+
+        if (nodeType.startsWith('rules.')) {
+            updates.rules = updates.rules || [];
+            updates.rules.push(value);
+        } else if (nodeType.startsWith('instructions.')) {
+            updates.instructions = updates.instructions || [];
+            updates.instructions.push(value);
+        } else if (nodeType.startsWith('dialogue.')) {
+            updates.example_dialogue = updates.example_dialogue || [];
+            const dialogueNode = node.closest('.dialogue-node');
+            const speakerType = dialogueNode.querySelector('.speaker-type-select').value;
+            updates.example_dialogue.push(`${speakerType === 'agent' ? 'Agent' : 'Customer'}: ${value}`);
+        } else if (!nodeType.startsWith('persona.')) { //Avoid overwriting persona values already collected
+            updates[nodeType] = value;
+        }
+    });
+
+    try {
+        const response = await fetch(`/update-template/${templateId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+            },
+            body: JSON.stringify(updates)
+        });
+
+        if (!response.ok) throw new Error('Failed to save changes');
+
+        showSuccess('Changes saved successfully');
+        hasUnsavedChanges = false;
+        updateSaveButtons(true);
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Failed to save changes');
+    }
+}
+
+function showError(message) {
+    errorAlert.textContent = message;
+    errorAlert.classList.remove('d-none');
+    setTimeout(() => errorAlert.classList.add('d-none'), 5000);
+}
+
+function showSuccess(message) {
+    successAlert.textContent = message;
+    successAlert.classList.remove('d-none');
+    setTimeout(() => successAlert.classList.add('d-none'), 5000);
+}
+
+
+const originalMakeNodeEditable = makeNodeEditable;
+makeNodeEditable = (element) => {
+    originalMakeNodeEditable(element);
+    updateSaveButtons(false);
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const optimizeForm = document.getElementById('optimizeForm');
+    const schemaId = document.getElementById('schemaId');
+    const optimizeBtn = document.getElementById('optimizeBtn');
+    const optimizingStatus = document.getElementById('optimizingStatus');
+    const errorAlert = document.getElementById('errorAlert');
+    const successAlert = document.getElementById('successAlert');
+    const templatePreview = document.getElementById('templatePreview');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const bottomSaveChangesBtn = document.getElementById('bottomSaveChangesBtn');
+
+    optimizeForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const selectedId = schemaId.value;
+        if (!selectedId) {
+            showError('Please select a template to optimize');
+            return;
+        }
+
+        const customOptimization = document.getElementById('customOptimization').value.trim();
+        if (!customOptimization) {
+            showError('Please enter an optimization request');
+            return;
+        }
+
+        optimizeBtn.disabled = true;
+        optimizingStatus.classList.remove('d-none');
+        errorAlert.classList.add('d-none');
+
+        try {
+            const response = await fetch(`/optimize-schema/${selectedId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+                },
+                body: JSON.stringify({
+                    custom_optimization: customOptimization
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to optimize schema');
+            }
+
+            await loadTemplatePreview(selectedId);
+            showSuccess('Template optimized successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError(error.message || 'An unexpected error occurred');
+        } finally {
+            optimizeBtn.disabled = false;
+            optimizingStatus.classList.add('d-none');
+        }
+    });
+
+    schemaId.addEventListener('change', function() {
+        const selectedId = this.value;
+        if (selectedId) {
+            loadTemplatePreview(selectedId);
+        } else {
+            templatePreview.classList.add('d-none');
+        }
+    });
+
+    saveChangesBtn.addEventListener('click', saveChanges);
+    bottomSaveChangesBtn.addEventListener('click', saveChanges);
+
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        }
+    });
+
+    // Add Preview XML button handler
+    const previewXmlBtn = document.getElementById('previewXmlBtn');
+    const xmlPreviewModal = new bootstrap.Modal(document.getElementById('xmlPreviewModal'));
+    const xmlPreviewContent = document.getElementById('xmlPreviewContent');
+    const copyXmlBtn = document.getElementById('copyXmlBtn');
+
+    previewXmlBtn.addEventListener('click', function() {
+        // Get current content
+        const content = [];
+        content.push('<system_message>');
+
+        // Bio
+        const bio = document.querySelector('[data-node-type="bio"]')?.textContent || '';
+        content.push('    <bio>' + bio + '</bio>');
+
+        // Voice Style
+        const voiceStyle = document.querySelector('[data-node-type="voice_style"]')?.textContent || '';
+        content.push('    <voice_style>' + voiceStyle + '</voice_style>');
+
+        // Persona
+        content.push('    <persona>');
+        const personaSection = document.getElementById('personaSection');
+        const personaNodes = personaSection.querySelectorAll('.dialogue-node');
+        personaNodes.forEach(node => {
+            const type = node.querySelector('select')?.value;
+            const value = node.querySelector('.editable-node')?.textContent || '';
+            if (type && value) {
+                content.push('        <' + type + '>' + value + '</' + type + '>');
+            }
+        });
+        content.push('    </persona>');
+
+        // Rules
+        content.push('    <important_rules>');
+        const rulesSection = document.getElementById('rulesSection');
+        rulesSection.querySelectorAll('.editable-node').forEach(node => {
+            const rule = node.textContent;
+            content.push('        <rule>' + rule + '</rule>');
+        });
+        content.push('    </important_rules>');
+
+        // Instructions
+        content.push('    <instructions>');
+        content.push('        You are assisting customers with their orders. Ensure you collect the following information. if any are missing are missing, be sure to ask the caller to provide any of the following required information. If the caller is not sure of the answer, be sure to prompt the caller to provide any missing information. The following information is required for each order item:');
+        content.push('        <required_information>');
+        const instructionsSection = document.getElementById('instructionsSection');
+        instructionsSection.querySelectorAll('.editable-node').forEach(node => {
+            const instruction = node.textContent;
+            content.push('            <item>' + instruction + '</item>');
+        });
+        content.push('        </required_information>');
+
+        // Example Dialogue
+        content.push('        Here is an ideal call flow example to strive for. Do your best to answer verbatim based on similar responses by caller. If call flow veers off track, be sure to continue on when the next caller utterance is matched to any intent or is matched semantically to a similar dialogue node in the following target call flow:');
+        content.push('        <ideal_call_example>');
+        content.push('            <dialogue>');
+        const dialogueSection = document.getElementById('dialogueSection');
+        dialogueSection.querySelectorAll('.dialogue-node').forEach(node => {
+            const speakerType = node.querySelector('select')?.value;
+            const text = node.querySelector('.editable-node')?.textContent || '';
+            if (speakerType && text) {
+                const tag = speakerType === 'agent' ? 'agent' : 'customer';
+                content.push('                <' + tag + '>' + text + '</' + tag + '>');
+            }
+        });
+        content.push('            </dialogue>');
+        content.push('        </ideal_call_example>');
+        content.push('    </instructions>');
+        content.push('</system_message>');
+
+        xmlPreviewContent.textContent = content.join('\n');
+        xmlPreviewModal.show();
+    });
+
+    // Copy to clipboard functionality
+    copyXmlBtn.addEventListener('click', async function() {
+        try {
+            await navigator.clipboard.writeText(xmlPreviewContent.textContent);
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-check"></i> Copied!';
+            setTimeout(() => {
+                this.innerHTML = originalText;
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy text:', err);
+        }
+    });
+});
+</script>
+
+{% endblock %}

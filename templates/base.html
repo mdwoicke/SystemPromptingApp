@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Message Manager</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+<script>
+function addPersonaNode() {
+    const personaContainer = document.getElementById('persona-container');
+    const newNode = document.createElement('div');
+    newNode.className = 'mb-2 persona-node';
+    newNode.innerHTML = `
+        <div class="input-group">
+            <select class="form-select" style="max-width: 200px;" onchange="updateSaveButtons()">
+                <option value="age">Age</option>
+                <option value="occupation">Occupation</option>
+                <option value="attitude">Attitude</option>
+                <option value="education">Education</option>
+                <option value="personality">Personality</option>
+                <option value="communication_style">Communication Style</option>
+                <option value="skills">Skills</option>
+                <option value="knowledge">Knowledge</option>
+            </select>
+            <input type="text" class="form-control" placeholder="Value" onchange="updateSaveButtons()">
+            <button class="btn btn-danger" onclick="this.parentElement.parentElement.remove(); updateSaveButtons()">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `;
+    personaContainer.appendChild(newNode);
+    updateSaveButtons();
+}
+
+function updateSaveButtons() {
+    const saveButtons = document.querySelectorAll('.save-template');
+    saveButtons.forEach(button => {
+        button.disabled = false;
+    });
+}
+
+function wrapEditableNode(element) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'input-group mb-2';
+    wrapper.innerHTML = `
+        <input type="text" class="form-control" value="${element.textContent}" onchange="updateSaveButtons()">
+        <button class="btn btn-danger" onclick="this.parentElement.remove(); updateSaveButtons()">
+            <i class="bi bi-trash"></i>
+        </button>
+    `;
+    return wrapper;
+}
+</script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-chat-square-text me-2"></i>System Message Manager
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="bi bi-house"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('list_messages') }}">
+                            <i class="bi bi-list-ul"></i> Messages
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('generate_template') }}">
+                            <i class="bi bi-magic"></i> AI Generate
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('template_builder') }}">
+                            <i class="bi bi-tools"></i> Builder
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('optimize_view') }}">
+                            <i class="bi bi-lightning"></i> Optimize
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('list_categories') }}">
+                            <i class="bi bi-folder"></i> Categories
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('list_tags') }}">
+                            <i class="bi bi-tags"></i> Tags
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
